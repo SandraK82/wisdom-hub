@@ -7,10 +7,10 @@ use std::collections::HashMap;
 
 use super::Address;
 
-/// A domain of expertise
+/// A domain of expertise (renamed from Domain to avoid conflict with address::Domain)
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum Domain {
+pub enum ExpertiseDomain {
     /// Programming-related (e.g., "rust", "python", "typescript")
     Programming(String),
     /// Science-related (e.g., "physics", "biology", "chemistry")
@@ -21,35 +21,35 @@ pub enum Domain {
     Custom(String),
 }
 
-impl Domain {
+impl ExpertiseDomain {
     /// Create a programming domain
     pub fn programming(lang: impl Into<String>) -> Self {
-        Domain::Programming(lang.into())
+        ExpertiseDomain::Programming(lang.into())
     }
 
     /// Create a science domain
     pub fn science(field: impl Into<String>) -> Self {
-        Domain::Science(field.into())
+        ExpertiseDomain::Science(field.into())
     }
 
     /// Create a business domain
     pub fn business(area: impl Into<String>) -> Self {
-        Domain::Business(area.into())
+        ExpertiseDomain::Business(area.into())
     }
 
     /// Create a custom domain
     pub fn custom(name: impl Into<String>) -> Self {
-        Domain::Custom(name.into())
+        ExpertiseDomain::Custom(name.into())
     }
 }
 
-impl std::fmt::Display for Domain {
+impl std::fmt::Display for ExpertiseDomain {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Domain::Programming(s) => write!(f, "programming:{}", s),
-            Domain::Science(s) => write!(f, "science:{}", s),
-            Domain::Business(s) => write!(f, "business:{}", s),
-            Domain::Custom(s) => write!(f, "custom:{}", s),
+            ExpertiseDomain::Programming(s) => write!(f, "programming:{}", s),
+            ExpertiseDomain::Science(s) => write!(f, "science:{}", s),
+            ExpertiseDomain::Business(s) => write!(f, "business:{}", s),
+            ExpertiseDomain::Custom(s) => write!(f, "custom:{}", s),
         }
     }
 }
@@ -58,7 +58,7 @@ impl std::fmt::Display for Domain {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Bias {
     /// The domain this bias applies to
-    pub domain: Domain,
+    pub domain: ExpertiseDomain,
     /// Description of the bias
     pub description: String,
     /// Severity of the bias (0.0 to 1.0)
@@ -67,7 +67,7 @@ pub struct Bias {
 
 impl Bias {
     /// Create a new bias
-    pub fn new(domain: Domain, description: impl Into<String>, severity: f32) -> Self {
+    pub fn new(domain: ExpertiseDomain, description: impl Into<String>, severity: f32) -> Self {
         Self {
             domain,
             description: description.into(),

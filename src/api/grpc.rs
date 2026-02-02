@@ -241,6 +241,8 @@ fn pb_to_create_fragment(req: pb::CreateFragmentRequest) -> Result<ModelCreateFr
         creator,
         when: None,
         signature: req.signature,
+        confidence: None,
+        evidence_type: None,
     })
 }
 
@@ -259,6 +261,7 @@ fn pb_to_create_relation(req: pb::CreateRelationRequest) -> Result<ModelCreateRe
         relation_type: req.relation_type,
         creator,
         signature: req.signature,
+        confidence: None,
     })
 }
 
@@ -337,6 +340,7 @@ fn hub_error_to_status(e: models::HubError) -> Status {
         models::HubError::RateLimitExceeded => Status::resource_exhausted("Rate limit exceeded"),
         models::HubError::Unauthorized(msg) => Status::unauthenticated(msg),
         models::HubError::ValidationError(msg) => Status::invalid_argument(msg),
+        models::HubError::ResourceLimitExceeded(msg) => Status::resource_exhausted(msg),
         models::HubError::Internal(msg) => Status::internal(msg),
     }
 }
