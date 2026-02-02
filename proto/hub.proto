@@ -1,0 +1,345 @@
+syntax = "proto3";
+package wisdom.hub.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+// ============================================================================
+// Core Entity Messages (aligned with Gateway data model)
+// ============================================================================
+
+// Address format: "server:port/DOMAIN/entity-uuid"
+// Domain: AGENT, TAG, FRAGMENT, RELATION, TRANSFORMATION, HUB
+
+message Agent {
+    string uuid = 1;
+    string public_key = 2;           // Base64-encoded Ed25519 public key
+    string description = 3;
+    string primary_hub = 4;          // Hub address
+    int32 version = 5;
+    TrustStore trust = 6;            // Embedded trust relations
+    string signature = 7;
+    google.protobuf.Timestamp created_at = 8;
+    google.protobuf.Timestamp updated_at = 9;
+}
+
+message TrustStore {
+    repeated Trust trusts = 1;
+}
+
+message Trust {
+    string agent_address = 1;        // Address of trusted agent
+    float trust_level = 2;           // -1.0 to 1.0
+}
+
+message Fragment {
+    string uuid = 1;
+    repeated string tag_addresses = 2;   // Address strings
+    string transform_address = 3;        // Optional transform address
+    string content = 4;
+    string content_hash = 5;             // SHA-256 hash
+    string creator_address = 6;          // Agent address
+    int32 version = 7;
+    google.protobuf.Timestamp when = 8;  // Content timestamp
+    string signature = 9;
+    google.protobuf.Timestamp created_at = 10;
+    google.protobuf.Timestamp updated_at = 11;
+}
+
+message Relation {
+    string uuid = 1;
+    string from_address = 2;         // Source entity address
+    string to_address = 3;           // Target entity address
+    string relation_type = 4;        // RelationType enum as string
+    string creator_address = 5;      // Agent address
+    int32 version = 6;
+    string signature = 7;
+    google.protobuf.Timestamp created_at = 8;
+}
+
+// RelationType: TRUST, SUPPORTS, CONTRADICTS, EXTENDS, SUPERSEDES, DERIVED_FROM,
+//               RELATED_TO, EXAMPLE_OF, QUESTION, HYPOTHESE, ANTITHESE, SYNTHESE,
+//               SPECIALIZES, CLARIFIES, GENERALIZES
+
+message Tag {
+    string uuid = 1;
+    string name = 2;
+    string content = 3;              // Was 'description'
+    string category = 4;             // TagCategory enum as string
+    string creator_address = 5;      // Agent address
+    int32 version = 6;
+    string signature = 7;
+    google.protobuf.Timestamp created_at = 8;
+}
+
+// TagCategory: PLATFORM, LANGUAGE, FRAMEWORK, LIBRARY, VERSION, DOMAIN,
+//              TYPE, ENVIRONMENT, ARCHITECTURE, COUNTRY, FIELD
+
+message Transform {
+    string uuid = 1;
+    string name = 2;
+    string description = 3;
+    repeated string tag_addresses = 4;
+    string transform_to = 5;         // Target format
+    string transform_from = 6;       // Source format
+    string additional_data = 7;      // JSON config
+    string agent_address = 8;        // Creator agent address
+    int32 version = 9;
+    string signature = 10;
+    google.protobuf.Timestamp created_at = 11;
+}
+
+// ============================================================================
+// Request/Response Messages
+// ============================================================================
+
+// Agents
+message CreateAgentRequest {
+    string uuid = 1;                 // Optional, will be generated if empty
+    string public_key = 2;
+    string description = 3;
+    string primary_hub = 4;
+    string signature = 5;
+    string created_by = 6;           // For validation (not stored)
+}
+
+message GetAgentRequest {
+    string uuid = 1;
+}
+
+message ListAgentsRequest {
+    int32 limit = 1;
+    string cursor = 2;
+}
+
+message ListAgentsResponse {
+    repeated Agent agents = 1;
+    string next_cursor = 2;
+}
+
+// Fragments
+message CreateFragmentRequest {
+    string uuid = 1;
+    repeated string tag_addresses = 2;
+    string transform_address = 3;
+    string content = 4;
+    string created_by = 5;           // Creator agent address
+    google.protobuf.Timestamp when = 6;
+    string signature = 7;
+}
+
+message GetFragmentRequest {
+    string uuid = 1;
+}
+
+message SearchFragmentsRequest {
+    string query = 1;
+    repeated string tag_addresses = 2;
+    int32 limit = 3;
+    string cursor = 4;
+}
+
+// Relations
+message CreateRelationRequest {
+    string uuid = 1;
+    string from_address = 2;
+    string to_address = 3;
+    string relation_type = 4;
+    string created_by = 5;           // Creator agent address
+    string signature = 6;
+}
+
+message GetRelationRequest {
+    string uuid = 1;
+}
+
+// Tags
+message CreateTagRequest {
+    string uuid = 1;
+    string name = 2;
+    string content = 3;
+    string category = 4;             // TagCategory enum as string
+    string created_by = 5;           // Creator agent address
+    string signature = 6;
+}
+
+message GetTagRequest {
+    string uuid = 1;
+}
+
+message ListTagsRequest {
+    int32 limit = 1;
+    string cursor = 2;
+}
+
+message ListTagsResponse {
+    repeated Tag tags = 1;
+    string next_cursor = 2;
+}
+
+// Transforms
+message CreateTransformRequest {
+    string uuid = 1;
+    string name = 2;
+    string description = 3;
+    repeated string tag_addresses = 4;
+    string transform_to = 5;
+    string transform_from = 6;
+    string additional_data = 7;
+    string agent_address = 8;        // Creator agent address
+    string signature = 9;
+}
+
+message GetTransformRequest {
+    string uuid = 1;
+}
+
+// Trust (embedded in Agent, path finding via service)
+message TrustPathRequest {
+    string from_address = 1;         // Agent address
+    string to_address = 2;           // Entity address
+}
+
+message TrustPath {
+    string from_address = 1;
+    string to_address = 2;
+    repeated TrustPathHop hops = 3;
+    float effective_trust = 4;
+    int32 depth = 5;
+}
+
+message TrustPathHop {
+    string agent_address = 1;
+    float trust_level = 2;
+}
+
+message TrustScoreRequest {
+    string entity_address = 1;       // Entity to score
+    string viewer_address = 2;       // Viewer perspective (agent address)
+}
+
+message TrustScore {
+    string entity_address = 1;
+    string viewer_address = 2;
+    float score = 3;
+    int32 path_count = 4;
+    TrustPath best_path = 5;
+}
+
+// Discovery
+message HubRegistration {
+    string hub_id = 1;
+    string public_url = 2;
+    repeated string capabilities = 3;
+    string version = 4;
+    string public_key = 5;
+    string signature = 6;
+}
+
+message RegistrationResponse {
+    bool registered = 1;
+    string message = 2;
+    HubList hub_list = 3;
+}
+
+message HeartbeatRequest {
+    string hub_id = 1;
+    string status = 2;
+    HubStats stats = 3;
+}
+
+message HeartbeatResponse {
+    bool acknowledged = 1;
+    google.protobuf.Timestamp server_time = 2;
+}
+
+message HubStats {
+    int64 entities_count = 1;
+    int64 agents_count = 2;
+    int64 fragments_count = 3;
+    double uptime_seconds = 4;
+}
+
+message HubInfo {
+    string hub_id = 1;
+    string public_url = 2;
+    string role = 3;
+    string status = 4;
+    google.protobuf.Timestamp last_seen = 5;
+    repeated string capabilities = 6;
+    HubStats stats = 7;
+}
+
+message HubList {
+    repeated HubInfo hubs = 1;
+    int64 version = 2;
+    google.protobuf.Timestamp updated_at = 3;
+}
+
+// Federated Search
+message FederatedSearchRequest {
+    string query = 1;
+    int32 min_results = 2;
+    bool federate = 3;
+    repeated string tag_addresses = 4;
+    int32 limit = 5;
+}
+
+message SearchResult {
+    Fragment fragment = 1;
+    string source_hub_id = 2;
+    float relevance_score = 3;
+}
+
+message FederatedSearchResponse {
+    repeated SearchResult results = 1;
+    repeated SearchSource sources = 2;
+    bool federated = 3;
+    int32 total = 4;
+}
+
+message SearchSource {
+    string hub_id = 1;
+    int32 count = 2;
+}
+
+// ============================================================================
+// Hub Service Definition
+// ============================================================================
+
+service HubService {
+    // Agents
+    rpc CreateAgent(CreateAgentRequest) returns (Agent);
+    rpc GetAgent(GetAgentRequest) returns (Agent);
+    rpc ListAgents(ListAgentsRequest) returns (ListAgentsResponse);
+
+    // Fragments
+    rpc CreateFragment(CreateFragmentRequest) returns (Fragment);
+    rpc GetFragment(GetFragmentRequest) returns (Fragment);
+    rpc SearchFragments(SearchFragmentsRequest) returns (stream Fragment);
+
+    // Relations
+    rpc CreateRelation(CreateRelationRequest) returns (Relation);
+    rpc GetRelation(GetRelationRequest) returns (Relation);
+
+    // Tags
+    rpc CreateTag(CreateTagRequest) returns (Tag);
+    rpc GetTag(GetTagRequest) returns (Tag);
+    rpc ListTags(ListTagsRequest) returns (ListTagsResponse);
+
+    // Transforms
+    rpc CreateTransform(CreateTransformRequest) returns (Transform);
+    rpc GetTransform(GetTransformRequest) returns (Transform);
+
+    // Trust (path finding, score calculation)
+    rpc CalculateTrustPath(TrustPathRequest) returns (TrustPath);
+    rpc GetTrustScore(TrustScoreRequest) returns (TrustScore);
+
+    // Discovery
+    rpc RegisterHub(HubRegistration) returns (RegistrationResponse);
+    rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+    rpc GetKnownHubs(google.protobuf.Empty) returns (HubList);
+
+    // Federated Search
+    rpc FederatedSearch(FederatedSearchRequest) returns (FederatedSearchResponse);
+}

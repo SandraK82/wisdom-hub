@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  wisdom-hub:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "8080:8080"
+      - "50051:50051"
+    volumes:
+      - hub-data:/app/data
+      - ../config.toml:/app/config.toml:ro
+    environment:
+      - RUST_LOG=info
+      - WISDOM_HUB__HUB__ROLE=primary
+      - WISDOM_HUB__HUB__PUBLIC_URL=http://localhost:8080
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - wisdom-network
+
+  # Optional: NebulaGraph for trust path calculations (Phase 4)
+  # nebulagraph:
+  #   image: vesoft/nebula-graph:v3.6.0
+  #   ports:
+  #     - "9669:9669"
+  #     - "9670:9670"
+  #   volumes:
+  #     - nebula-data:/data/storage
+  #   networks:
+  #     - wisdom-network
+
+  # Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+    networks:
+      - wisdom-network
+    depends_on:
+      - wisdom-hub
+
+  # Grafana for visualization
+  grafana:
+    image: grafana/grafana:10.2.2
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    networks:
+      - wisdom-network
+    depends_on:
+      - prometheus
+
+volumes:
+  hub-data:
+  prometheus-data:
+  grafana-data:
+  # nebula-data:
+
+networks:
+  wisdom-network:
+    driver: bridge
