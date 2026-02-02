@@ -8,6 +8,7 @@ use std::str::FromStr;
 use super::Address;
 
 /// Known relation types
+/// Note: Fragment typing (QUESTION, HYPOTHESIS, etc.) now uses TYPE tags instead.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum RelationType {
@@ -23,18 +24,10 @@ pub enum RelationType {
     Supersedes,
     /// From is derived from To
     DerivedFrom,
-    /// Generic relation
+    /// Generic relation (also used for tag application)
     RelatedTo,
     /// From is an example of To
     ExampleOf,
-    /// Fragment is a question (self-reference)
-    Question,
-    /// Fragment is a hypothesis (self-reference)
-    Hypothese,
-    /// Fragment is an antithesis (self-reference)
-    Antithese,
-    /// Fragment is a synthesis (self-reference)
-    Synthese,
     /// From specializes To
     Specializes,
     /// From clarifies To
@@ -60,10 +53,6 @@ impl fmt::Display for RelationType {
             RelationType::DerivedFrom => write!(f, "DERIVED_FROM"),
             RelationType::RelatedTo => write!(f, "RELATED_TO"),
             RelationType::ExampleOf => write!(f, "EXAMPLE_OF"),
-            RelationType::Question => write!(f, "QUESTION"),
-            RelationType::Hypothese => write!(f, "HYPOTHESE"),
-            RelationType::Antithese => write!(f, "ANTITHESE"),
-            RelationType::Synthese => write!(f, "SYNTHESE"),
             RelationType::Specializes => write!(f, "SPECIALIZES"),
             RelationType::Clarifies => write!(f, "CLARIFIES"),
             RelationType::Generalizes => write!(f, "GENERALIZES"),
@@ -84,10 +73,6 @@ impl FromStr for RelationType {
             "DERIVED_FROM" => Ok(RelationType::DerivedFrom),
             "RELATED_TO" => Ok(RelationType::RelatedTo),
             "EXAMPLE_OF" => Ok(RelationType::ExampleOf),
-            "QUESTION" => Ok(RelationType::Question),
-            "HYPOTHESE" => Ok(RelationType::Hypothese),
-            "ANTITHESE" => Ok(RelationType::Antithese),
-            "SYNTHESE" => Ok(RelationType::Synthese),
             "SPECIALIZES" => Ok(RelationType::Specializes),
             "CLARIFIES" => Ok(RelationType::Clarifies),
             "GENERALIZES" => Ok(RelationType::Generalizes),
@@ -223,10 +208,6 @@ pub fn valid_relation_types() -> Vec<RelationType> {
         RelationType::DerivedFrom,
         RelationType::RelatedTo,
         RelationType::ExampleOf,
-        RelationType::Question,
-        RelationType::Hypothese,
-        RelationType::Antithese,
-        RelationType::Synthese,
         RelationType::Specializes,
         RelationType::Clarifies,
         RelationType::Generalizes,
@@ -256,11 +237,12 @@ mod tests {
         let from = Address::fragment("hub:8080", "frag-1");
         let creator = Address::agent("hub:8080", "agent-1");
 
-        let relation = Relation::self_reference(from.clone(), creator.clone(), RelationType::Question)
+        // Self-reference relations now use RELATED_TO to link to TYPE tags
+        let relation = Relation::self_reference(from.clone(), creator.clone(), RelationType::RelatedTo)
             .with_signature("sig");
 
         assert!(relation.is_self_reference());
-        assert_eq!(relation.relation_type, RelationType::Question);
+        assert_eq!(relation.relation_type, RelationType::RelatedTo);
     }
 
     #[test]
