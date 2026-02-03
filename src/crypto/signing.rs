@@ -2,6 +2,7 @@
 
 use base64::{engine::general_purpose::STANDARD, Engine};
 use ed25519_dalek::{Signature, Signer, Verifier, VerifyingKey};
+use serde_json::Value;
 
 use super::KeyPair;
 use crate::models::{HubError, HubResult};
@@ -35,6 +36,27 @@ pub fn verify(public_key: &VerifyingKey, data: &[u8], signature_b64: &str) -> Hu
 pub fn verify_with_key(public_key_b64: &str, data: &[u8], signature_b64: &str) -> HubResult<bool> {
     let public_key = super::parse_public_key(public_key_b64)?;
     verify(&public_key, data, signature_b64)
+}
+
+/// Create a canonical JSON string from a serde_json::Value.
+/// Keys are sorted recursively to ensure deterministic output across all implementations.
+pub fn canonical_json(value: &Value) -> String {
+    match value {
+        Value::Object(map) => {
+            let mut keys: Vec<&String> = map.keys().collect();
+            keys.sort();
+            let pairs: Vec<String> = keys
+                .iter()
+                .map(|k| format!("{}:{}", serde_json::to_string(k).unwrap(), canonical_json(&map[*k])))
+                .collect();
+            format!("{{{}}}", pairs.join(","))
+        }
+        Value::Array(arr) => {
+            let items: Vec<String> = arr.iter().map(|v| canonical_json(v)).collect();
+            format!("[{}]", items.join(","))
+        }
+        _ => serde_json::to_string(value).unwrap(),
+    }
 }
 
 /// A trait for signable entities

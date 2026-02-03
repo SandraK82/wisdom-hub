@@ -92,16 +92,24 @@ pub struct Relation {
     /// Target entity (optional for self-reference)
     #[serde(default)]
     pub to: Address,
+    /// Agent who asserts this relation
+    #[serde(default)]
+    pub by: Address,
     /// Type of relationship
     #[serde(rename = "type")]
     pub relation_type: RelationType,
+    /// Optional reasoning/explanation
+    #[serde(default)]
+    pub content: String,
     /// Agent who created this relation
     pub creator: Address,
     /// Version number
     pub version: u32,
     /// Ed25519 signature over the relation data
     pub signature: String,
-    /// When the relation was created
+    /// Content timestamp (when the relation was asserted)
+    pub when: DateTime<Utc>,
+    /// When the relation was stored in the database
     pub created_at: DateTime<Utc>,
     /// Strength of this relationship (0.0 to 1.0)
     #[serde(default = "default_relation_confidence")]
@@ -115,15 +123,19 @@ fn default_relation_confidence() -> f32 {
 impl Relation {
     /// Create a new relation
     pub fn new(from: Address, to: Address, creator: Address, relation_type: RelationType) -> Self {
+        let now = Utc::now();
         Self {
             uuid: uuid::Uuid::new_v4().to_string(),
             from,
             to,
+            by: creator.clone(),
             relation_type,
+            content: String::new(),
             creator,
             version: 1,
             signature: String::new(),
-            created_at: Utc::now(),
+            when: now,
+            created_at: now,
             confidence: 1.0,
         }
     }
@@ -175,21 +187,47 @@ pub struct CreateRelationRequest {
     pub from: Address,
     #[serde(default)]
     pub to: Address,
-    pub relation_type: String,
+    /// Agent who asserts this relation
+    #[serde(default)]
+    pub by: Address,
+    #[serde(alias = "relation_type")]
+    pub r#type: String,
+    /// Optional reasoning/explanation
+    #[serde(default)]
+    pub content: Option<String>,
     pub creator: Address,
+    /// Creation timestamp
+    #[serde(default)]
+    pub when: Option<DateTime<Utc>>,
     pub signature: String,
     /// Strength of this relationship (0.0 to 1.0)
     #[serde(default)]
     pub confidence: Option<f32>,
 }
 
+impl CreateRelationRequest {
+    /// Get the relation type string (handles both "type" and "relation_type" fields)
+    pub fn relation_type(&self) -> &str {
+        &self.r#type
+    }
+}
+
 impl From<CreateRelationRequest> for Relation {
     fn from(req: CreateRelationRequest) -> Self {
         let uuid = req.uuid.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
-        let relation_type = req.relation_type.parse().unwrap_or_default();
+        let relation_type = req.r#type.parse().unwrap_or_default();
         let mut relation = Relation::new(req.from, req.to, req.creator, relation_type);
         relation.uuid = uuid;
         relation.signature = req.signature;
+        if !req.by.entity.is_empty() {
+            relation.by = req.by;
+        }
+        if let Some(content) = req.content {
+            relation.content = content;
+        }
+        if let Some(when) = req.when {
+            relation.when = when;
+        }
         if let Some(confidence) = req.confidence {
             relation = relation.with_confidence(confidence);
         }

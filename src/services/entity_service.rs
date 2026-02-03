@@ -2,7 +2,9 @@
 
 use std::sync::Arc;
 
-use crate::crypto::verify_with_key;
+use serde_json::json;
+
+use crate::crypto::{canonical_json, verify_with_key};
 use crate::models::{
     Agent, CreateAgentRequest, Fragment, CreateFragmentRequest,
     Relation, CreateRelationRequest, Tag, CreateTagRequest,
@@ -51,9 +53,37 @@ impl EntityService {
             return Err(HubError::InvalidPublicKey("Public key cannot be empty".to_string()));
         }
 
+        // Verify signature if enabled
+        if self.verify_signatures {
+            self.verify_agent_signature(&req)?;
+        }
+
         let agent = Agent::from(req);
         self.store.put_agent(&agent)?;
         Ok(agent)
+    }
+
+    /// Verify agent signature using canonical JSON over all fields
+    fn verify_agent_signature(&self, req: &CreateAgentRequest) -> HubResult<()> {
+        let uuid = req.uuid.clone().unwrap_or_default();
+
+        let payload = json!({
+            "description": req.description.as_deref().unwrap_or(""),
+            "primary_hub": req.primary_hub.as_deref().unwrap_or(""),
+            "public_key": req.public_key,
+            "trust": serde_json::Value::Object(serde_json::Map::new()),
+            "uuid": uuid,
+        });
+        let data = canonical_json(&payload);
+        let is_valid = verify_with_key(&req.public_key, data.as_bytes(), &req.signature)?;
+
+        if !is_valid {
+            return Err(HubError::InvalidSignature {
+                entity_type: "agent".to_string(),
+            });
+        }
+
+        Ok(())
     }
 
     /// Get an agent by UUID
@@ -101,9 +131,30 @@ impl EntityService {
         Ok(fragment)
     }
 
-    /// Verify fragment signature
+    /// Verify fragment signature using canonical JSON over all fields
     fn verify_fragment_signature(&self, req: &CreateFragmentRequest, public_key: &str) -> HubResult<()> {
-        let data = format!("{}:{}", req.content, req.creator);
+        let uuid = req.uuid.clone().unwrap_or_default();
+        let tags_json: Vec<serde_json::Value> = req.tags.as_ref()
+            .map(|t| t.iter().map(|a| serde_json::to_value(a).unwrap()).collect())
+            .unwrap_or_default();
+        let transform_json = req.transform.as_ref()
+            .map(|t| serde_json::to_value(t).unwrap())
+            .unwrap_or(serde_json::Value::Null);
+        let when_str = req.when.as_ref()
+            .map(|w| w.to_rfc3339_opts(chrono::SecondsFormat::Millis, true))
+            .unwrap_or_default();
+
+        let payload = json!({
+            "confidence": req.confidence.unwrap_or(0.5),
+            "content": req.content,
+            "creator": serde_json::to_value(&req.creator).unwrap(),
+            "evidence_type": req.evidence_type.as_ref().map(|e| e.to_string()).unwrap_or_else(|| "unknown".to_string()),
+            "tags": tags_json,
+            "transform": transform_json,
+            "uuid": uuid,
+            "when": when_str,
+        });
+        let data = canonical_json(&payload);
         let is_valid = verify_with_key(public_key, data.as_bytes(), &req.signature)?;
 
         if !is_valid {
@@ -170,12 +221,24 @@ impl EntityService {
         Ok(relation)
     }
 
-    /// Verify relation signature
+    /// Verify relation signature using canonical JSON over all fields
     fn verify_relation_signature(&self, req: &CreateRelationRequest, public_key: &str) -> HubResult<()> {
-        let data = format!(
-            "{}:{}:{}:{}",
-            req.from, req.to, req.relation_type, req.creator
-        );
+        let uuid = req.uuid.clone().unwrap_or_default();
+        let when_str = req.when.as_ref()
+            .map(|w| w.to_rfc3339_opts(chrono::SecondsFormat::Millis, true))
+            .unwrap_or_default();
+
+        let payload = json!({
+            "by": serde_json::to_value(&req.by).unwrap(),
+            "content": req.content.as_deref().unwrap_or(""),
+            "creator": serde_json::to_value(&req.creator).unwrap(),
+            "from": serde_json::to_value(&req.from).unwrap(),
+            "to": serde_json::to_value(&req.to).unwrap(),
+            "type": req.r#type,
+            "uuid": uuid,
+            "when": when_str,
+        });
+        let data = canonical_json(&payload);
         let is_valid = verify_with_key(public_key, data.as_bytes(), &req.signature)?;
 
         if !is_valid {
@@ -283,9 +346,18 @@ impl EntityService {
         Ok(tag)
     }
 
-    /// Verify tag signature
+    /// Verify tag signature using canonical JSON over all fields
     fn verify_tag_signature(&self, req: &CreateTagRequest, public_key: &str) -> HubResult<()> {
-        let data = format!("{}:{}:{}", req.name, req.category, req.creator);
+        let uuid = req.uuid.clone().unwrap_or_default();
+
+        let payload = json!({
+            "category": req.category.to_string(),
+            "content": req.content,
+            "creator": serde_json::to_value(&req.creator).unwrap(),
+            "name": req.name,
+            "uuid": uuid,
+        });
+        let data = canonical_json(&payload);
         let is_valid = verify_with_key(public_key, data.as_bytes(), &req.signature)?;
 
         if !is_valid {
@@ -340,12 +412,24 @@ impl EntityService {
         Ok(transform)
     }
 
-    /// Verify transform signature
+    /// Verify transform signature using canonical JSON over all fields
     fn verify_transform_signature(&self, req: &CreateTransformRequest, public_key: &str) -> HubResult<()> {
-        let data = format!(
-            "{}:{}:{}:{}",
-            req.name, req.transform_from, req.transform_to, req.agent
-        );
+        let uuid = req.uuid.clone().unwrap_or_default();
+        let tags_json: Vec<serde_json::Value> = req.tags.iter()
+            .map(|a| serde_json::to_value(a).unwrap())
+            .collect();
+
+        let payload = json!({
+            "additional_data": req.additional_data,
+            "agent": serde_json::to_value(&req.agent).unwrap(),
+            "description": req.description,
+            "name": req.name,
+            "tags": tags_json,
+            "transform_from": req.transform_from,
+            "transform_to": req.transform_to,
+            "uuid": uuid,
+        });
+        let data = canonical_json(&payload);
         let is_valid = verify_with_key(public_key, data.as_bytes(), &req.signature)?;
 
         if !is_valid {

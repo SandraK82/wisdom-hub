@@ -258,8 +258,11 @@ fn pb_to_create_relation(req: pb::CreateRelationRequest) -> Result<ModelCreateRe
         uuid: if req.uuid.is_empty() { None } else { Some(req.uuid) },
         from,
         to,
-        relation_type: req.relation_type,
+        by: creator.clone(),
+        r#type: req.relation_type,
+        content: None,
         creator,
+        when: None,
         signature: req.signature,
         confidence: None,
     })
