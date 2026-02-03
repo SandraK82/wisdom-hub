@@ -259,6 +259,7 @@ pub struct CreateAgentRequest {
     pub uuid: Option<String>,
     pub public_key: String,
     pub description: Option<String>,
+    pub trust: Option<TrustStore>,
     pub primary_hub: Option<String>,
     pub signature: String,
 }
@@ -271,6 +272,9 @@ impl From<CreateAgentRequest> for Agent {
 
         if let Some(desc) = req.description {
             agent = agent.with_description(desc);
+        }
+        if let Some(trust) = req.trust {
+            agent.trust = trust;
         }
         if let Some(hub) = req.primary_hub {
             agent = agent.with_primary_hub(hub);

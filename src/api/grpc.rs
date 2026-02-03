@@ -208,6 +208,7 @@ fn pb_to_create_agent(req: pb::CreateAgentRequest) -> Result<ModelCreateAgentReq
         uuid: if req.uuid.is_empty() { None } else { Some(req.uuid) },
         public_key: req.public_key,
         description: if req.description.is_empty() { None } else { Some(req.description) },
+        trust: None,
         primary_hub: if req.primary_hub.is_empty() { None } else { Some(req.primary_hub) },
         signature: req.signature,
     })

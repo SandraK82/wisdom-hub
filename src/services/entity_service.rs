@@ -66,12 +66,15 @@ impl EntityService {
     /// Verify agent signature using canonical JSON over all fields
     fn verify_agent_signature(&self, req: &CreateAgentRequest) -> HubResult<()> {
         let uuid = req.uuid.clone().unwrap_or_default();
+        let trust_val = req.trust.as_ref()
+            .map(|t| serde_json::to_value(t).unwrap())
+            .unwrap_or_else(|| json!({"num_trusts": 0, "trusts": []}));
 
         let payload = json!({
             "description": req.description.as_deref().unwrap_or(""),
             "primary_hub": req.primary_hub.as_deref().unwrap_or(""),
             "public_key": req.public_key,
-            "trust": serde_json::Value::Object(serde_json::Map::new()),
+            "trust": trust_val,
             "uuid": uuid,
         });
         let data = canonical_json(&payload);
